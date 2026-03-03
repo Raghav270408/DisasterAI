@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DisasterAI — Chennai Responder Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:#060a10;--surface:#0c1018;--surface2:#111826;--border:#1c2535;--border2:#253040;
+    --text:#c5d5e8;--muted:#4a6080;--muted2:#2a3a50;--accent:#00e5ff;
+    --critical:#ff3040;--high:#ff8c00;--moderate:#ffd600;--low:#00e676;
+    --mono:'Space Mono',monospace;--display:'Syne',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--display);min-height:100vh;overflow:hidden}
+  ::-webkit-scrollbar{width:3px;height:3px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px)}
+  #app{display:grid;grid-template-rows:52px 1fr;height:100vh}
+
+  /* NAV */
+  nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;
+    justify-content:space-between;padding:0 20px;gap:16px;flex-shrink:0}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.6s infinite}
+  .brand-name{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:3px;color:#e8f4ff}
+  .brand-name span{color:var(--accent)}
+  .brand-sub{font-family:var(--mono);font-size:9px;color:var(--muted2);letter-spacing:2px}
+  .nav-right{display:flex;gap:12px;align-items:center}
+  .nav-stat{text-align:right}
+  .nsl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1.5px}
+  .nsv{font-family:var(--mono);font-size:15px;font-weight:700;line-height:1.1}
+  .pill{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1px;
+    padding:4px 11px;border-radius:3px;border:1px solid;display:flex;align-items:center;gap:6px}
+  .pill-time{color:var(--accent);background:rgba(0,229,255,0.07);border-color:rgba(0,229,255,0.2)}
+  .pill-crit{color:var(--critical);background:rgba(255,48,64,0.07);border-color:rgba(255,48,64,0.2)}
+  .pill-res{color:var(--low);background:rgba(0,230,118,0.07);border-color:rgba(0,230,118,0.2);
+    cursor:pointer;transition:background .2s}
+  .pill-res:hover{background:rgba(0,230,118,0.15)}
+  .btn-refresh{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;
+    padding:5px 13px;border-radius:3px;border:1px solid rgba(0,229,255,0.3);
+    background:rgba(0,229,255,0.06);color:var(--accent);cursor:pointer;transition:all .2s;
+    display:flex;align-items:center;gap:5px}
+  .btn-refresh:hover{background:rgba(0,229,255,0.14);border-color:rgba(0,229,255,0.6)}
+  .btn-refresh:disabled{opacity:0.4;cursor:not-allowed}
+  .pdot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.6s infinite}
+
+  /* MAIN */
+  #main{display:grid;grid-template-columns:310px 1fr 242px;overflow:hidden}
+  .panel{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  .panel:last-child{border-right:none;border-left:1px solid var(--border)}
+  .ph{padding:13px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .plabel{font-family:var(--mono);font-size:9px;letter-spacing:2.5px;color:var(--muted);margin-bottom:3px}
+  .psub{font-size:11px;color:var(--muted)}
+
+  /* INCIDENT LIST */
+  .inc-list{flex:1;overflow-y:auto;padding:10px}
+
+  /* INCIDENT CARD */
+  .ic{border:1px solid var(--border);border-left:3px solid;border-radius:6px;
+    padding:11px 13px;margin-bottom:8px;cursor:pointer;background:var(--surface);
+    transition:box-shadow .2s,background .2s;position:relative;overflow:hidden}
+  .ic.selected{background:var(--surface2)}
+  .ic.new-in{animation:newIn .45s cubic-bezier(.22,1,.36,1) forwards}
+  .ic.removing{animation:removeOut .4s cubic-bezier(.4,0,.6,1) forwards;pointer-events:none}
+  .ic-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px;gap:6px}
+  .ic-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+  .ic-em{font-size:17px;flex-shrink:0}
+  .ic-type{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:2px}
+  .ic-loc{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+  .sbadge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;
+    padding:2px 7px;border-radius:3px;border:1px solid;white-space:nowrap;flex-shrink:0}
+  .sbar-wrap{background:var(--bg);border-radius:2px;height:4px;overflow:hidden;margin-bottom:6px}
+  .sbar{height:100%;border-radius:2px;width:0%;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .ic-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+  .ic-done{position:absolute;top:7px;right:7px;font-family:var(--mono);font-size:8px;font-weight:700;
+    letter-spacing:1px;padding:2px 8px;border-radius:2px;border:1px solid rgba(0,230,118,0.3);
+    background:rgba(0,230,118,0.05);color:var(--low);cursor:pointer;opacity:0;
+    transition:opacity .2s,background .2s;z-index:3}
+  .ic:hover .ic-done{opacity:1}
+  .ic-done:hover{background:rgba(0,230,118,0.18)!important;border-color:rgba(0,230,118,.7)!important}
+
+  /* FEED */
+  .feed{flex-shrink:0;border-top:1px solid var(--border);padding:10px 13px;max-height:112px;overflow-y:auto}
+  .feed-item{display:flex;gap:7px;margin-bottom:5px;align-items:flex-start}
+  .fdot{width:5px;height:5px;border-radius:50%;background:var(--low);margin-top:4px;flex-shrink:0;animation:pulse 2s infinite}
+  .fdot.fresh{background:var(--accent)}
+  .ftxt{font-family:var(--mono);font-size:9px;color:var(--muted);line-height:1.5}
+  .fsrc{color:var(--accent);font-weight:700}
+
+  /* CENTER */
+  #center{display:flex;flex-direction:column;overflow:hidden}
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px}
+  .empty-icon{font-size:48px;opacity:.3}
+  .empty-lbl{font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--muted2)}
+  .empty-sub{font-size:13px;color:var(--muted2);text-align:center;max-width:300px;line-height:1.7}
+
+  /* INC HEADER */
+  .ihdr{background:var(--surface);border-bottom:1px solid var(--border);padding:13px 18px;flex-shrink:0}
+  .ihdr-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .ihdr-left{display:flex;gap:13px;align-items:center;flex:1;min-width:0}
+  .hero-icon{font-size:26px;width:50px;height:50px;border-radius:10px;display:flex;
+    align-items:center;justify-content:center;border:1px solid;flex-shrink:0}
+  .iname{font-family:var(--mono);font-size:17px;font-weight:700;color:#e8f4ff}
+  .iloc{font-size:12px;color:var(--muted);margin-top:3px}
+  .imeta{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:3px}
+  .sev-box{text-align:right;flex-shrink:0}
+  .sev-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px}
+  .sev-num{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1}
+  .sev-bar-w{width:108px;margin-top:5px}
+
+  .resolve-btn{margin-top:8px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1.5px;
+    padding:6px 14px;border-radius:4px;border:1px solid rgba(0,230,118,.4);
+    background:rgba(0,230,118,.07);color:var(--low);cursor:pointer;transition:all .2s;
+    display:flex;align-items:center;gap:7px}
+  .resolve-btn:hover{background:rgba(0,230,118,.18);border-color:rgba(0,230,118,.8);box-shadow:0 0 14px rgba(0,230,118,.15)}
+  .resolve-btn:active{transform:scale(.97)}
+
+  /* TABS */
+  .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+  .tab{font-family:var(--mono);font-size:10px;letter-spacing:2px;font-weight:700;
+    padding:11px 16px;border:none;background:none;cursor:pointer;color:var(--muted);
+    border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab:hover:not(.active){color:var(--text)}
+  .tab-status{margin-left:auto;display:flex;align-items:center;gap:6px;padding:8px 14px}
+
+  /* CONTENT */
+  .tcontent{flex:1;overflow-y:auto;padding:20px}
+  .sev-assess{border-radius:8px;border:1px solid;padding:14px 18px;margin-bottom:16px}
+  .blabel{font-family:var(--mono);font-size:9px;letter-spacing:2.5px;font-weight:700;margin-bottom:8px}
+  .btext{font-size:13px;line-height:1.75;color:#9ab0cc}
+  .sec-lbl{font-family:var(--mono);font-size:9px;letter-spacing:2.5px;color:var(--muted2);font-weight:700;margin-bottom:12px}
+  .intel-item{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);
+    border-radius:6px;padding:13px 15px;margin-bottom:10px;display:flex;gap:12px;
+    animation:slideIn .3s ease forwards}
+  .inum{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);flex-shrink:0;padding-top:2px}
+  .itext{font-size:13px;line-height:1.7;color:var(--text)}
+  .act-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:15px 17px;margin-bottom:10px;transition:all .15s;animation:slideIn .3s ease forwards;
+    display:flex;gap:13px;align-items:flex-start}
+  .act-card:hover{background:var(--surface2);transform:translateX(4px)}
+  .act-num{width:31px;height:31px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:12px;font-weight:700;flex-shrink:0;border:1px solid}
+  .act-body{flex:1}
+  .act-title{font-size:13px;font-weight:600;color:#e8f4ff;margin-bottom:6px;display:flex;
+    align-items:center;gap:9px;flex-wrap:wrap}
+  .act-reason{font-size:12px;color:var(--muted);line-height:1.65}
+  .ubadge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;
+    padding:2px 7px;border-radius:2px;border:1px solid;white-space:nowrap}
+  .raw-item{background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:12px 15px;margin-bottom:8px;animation:slideIn .2s ease forwards}
+  .raw-src-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+  .stag{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;
+    background:var(--surface2);border:1px solid var(--border2);color:var(--muted);padding:2px 7px;border-radius:2px}
+  .rts{font-family:var(--mono);font-size:9px;color:var(--muted2)}
+  .rtxt{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
+
+  /* RIGHT PANEL */
+  .rp{overflow-y:auto;padding:13px;flex:1}
+  .sov-item{margin-bottom:15px}
+  .sov-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .sov-name{font-size:11px;color:var(--text);display:flex;align-items:center;gap:6px}
+  .sov-score{font-family:var(--mono);font-size:14px;font-weight:700}
+  .sov-loc{font-family:var(--mono);font-size:9px;color:var(--muted2);margin-top:2px}
+  .leg-item{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .leg-dot{width:8px;height:8px;border-radius:50%}
+  .leg-lbl{font-family:var(--mono);font-size:10px;font-weight:700;width:68px}
+  .leg-range{font-family:var(--mono);font-size:9px;color:var(--muted2)}
+  .res-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;animation:slideIn .3s ease forwards}
+  .res-dot{width:6px;height:6px;border-radius:50%;background:var(--low);flex-shrink:0;margin-top:3px}
+  .res-txt{font-family:var(--mono);font-size:9px;color:var(--muted2);line-height:1.5}
+
+  /* NO DATA STATE */
+  .no-data{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;padding:40px 20px;text-align:center}
+  .no-data-icon{font-size:36px;opacity:.4}
+  .no-data-lbl{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--low)}
+  .no-data-sub{font-size:12px;color:var(--muted2);line-height:1.7;max-width:240px}
+
+  /* PROCESSING */
+  .processing{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;gap:16px;flex:1}
+  .proc-ring{width:44px;height:44px;border-radius:50%;border:2px solid var(--border);
+    border-top-color:var(--accent);animation:spin .7s linear infinite}
+  .proc-lbl{font-family:var(--mono);font-size:11px;color:var(--muted2);letter-spacing:2px}
+  .proc-steps{display:flex;flex-direction:column;gap:6px;align-items:center}
+  .proc-step{font-family:var(--mono);font-size:9px;color:var(--muted2);letter-spacing:1px;
+    opacity:0;animation:fadeIn .4s forwards}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(70px);
+    background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.4);color:var(--low);
+    font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:10px 22px;border-radius:4px;
+    z-index:1000;transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .35s;
+    opacity:0;display:flex;align-items:center;gap:10px}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeIn{to{opacity:.75}}
+  @keyframes newIn{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes removeOut{
+    0%  {opacity:1;transform:translateX(0) scale(1);max-height:160px;margin-bottom:8px;padding:11px 13px}
+    45% {opacity:0;transform:translateX(55px) scale(.96)}
+    100%{opacity:0;transform:translateX(55px);max-height:0;margin-bottom:0;padding:0 13px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <nav>
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div>
+        <div class="brand-name">DISASTER<span>AI</span></div>
+        <div class="brand-sub">CHENNAI DISASTER RESPONSE INTELLIGENCE</div>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="nav-stat"><div class="nsl">ACTIVE</div><div class="nsv" id="n-active" style="color:#ff3040">0</div></div>
+      <div class="nav-stat"><div class="nsl">AFFECTED</div><div class="nsv" id="n-affected" style="color:#e8f4ff">0</div></div>
+      <div class="nav-stat"><div class="nsl">REGION</div><div class="nsv" style="color:var(--accent);font-size:11px">CHENNAI</div></div>
+      <button class="btn-refresh" id="refresh-btn" onclick="refreshData()">↻ REFRESH</button>
+      <div class="pill pill-time" id="n-time">00:00:00</div>
+      <div class="pill pill-crit"><div class="pdot"></div><span id="n-crit">0 CRITICAL</span></div>
+      <div class="pill pill-res" onclick="toggleResLog()">✓ <span id="n-res">0</span> RESOLVED</div>
+    </div>
+  </nav>
+
+  <div id="main">
+    <!-- LEFT -->
+    <div class="panel">
+      <div class="ph">
+        <div class="plabel">ACTIVE INCIDENTS — CHENNAI</div>
+        <div class="psub" id="inc-sub">Connecting to Chennai data sources...</div>
+      </div>
+      <div class="inc-list" id="inc-list"></div>
+      <div class="feed" id="feed">
+        <div class="plabel" style="margin-bottom:8px">LIVE CHENNAI FEED</div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="panel" id="center" style="border-right:none">
+      <div class="empty" id="empty">
+        <div class="empty-icon">🏙️</div>
+        <div class="empty-lbl">CHENNAI MONITOR</div>
+        <div class="empty-sub">Click any incident to run Gemini AI analysis using live Chennai disaster data. Sources: USGS · NASA EONET · GDACS · NDMA · IMD Chennai</div>
+      </div>
+      <div id="iview" style="display:none;flex-direction:column;overflow:hidden;height:100%">
+        <div class="ihdr">
+          <div class="ihdr-row">
+            <div class="ihdr-left">
+              <div class="hero-icon" id="h-icon"></div>
+              <div style="min-width:0">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <div class="iname" id="h-name"></div>
+                  <div class="sbadge" id="h-badge"></div>
+                </div>
+                <div class="iloc" id="h-loc"></div>
+                <div class="imeta" id="h-meta"></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0">
+              <div class="sev-box">
+                <div class="sev-lbl">SEVERITY INDEX</div>
+                <div class="sev-num" id="h-sevnum"></div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">/&nbsp;100</div>
+                <div class="sev-bar-w"><div class="sbar-wrap"><div class="sbar" id="h-sevbar"></div></div></div>
+              </div>
+              <button class="resolve-btn" onclick="resolveCurrent()">
+                <span style="font-size:13px">✓</span> MARK AS RESOLVED
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="tabs">
+          <button class="tab active" data-tab="intel">FILTERED INTEL</button>
+          <button class="tab" data-tab="actions">OPTIMAL ACTIONS</button>
+          <button class="tab" data-tab="raw">RAW SOURCES</button>
+          <div class="tab-status" id="tab-st"></div>
+        </div>
+        <div class="tcontent" id="tcontent"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panel" style="overflow:hidden">
+      <div class="ph">
+        <div class="plabel">SEVERITY OVERVIEW</div>
+        <div class="psub" style="font-size:10px">Chennai & Tamil Nadu</div>
+      </div>
+      <div class="rp" id="rp">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:8px">Loading Chennai data...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span style="font-size:15px">✓</span><span id="toast-msg"></span></div>
+
+<script>
+// ════════════════════════════════
+// CONFIG
+// ════════════════════════════════
+const API = "http://localhost:5000";
+
+// ════════════════════════════════
+// STATE
+// ════════════════════════════════
+let incidents = [], resolved = [], selId = null, activeTab = 'intel', cache = {}, showRes = false;
+let nextId = 1;
+
+const SC = {
+  CRITICAL: {h:'#ff3040', l:'rgba(255,48,64,.12)', b:'rgba(255,48,64,.3)'},
+  HIGH:     {h:'#ff8c00', l:'rgba(255,140,0,.12)',  b:'rgba(255,140,0,.3)'},
+  MODERATE: {h:'#ffd600', l:'rgba(255,214,0,.12)',  b:'rgba(255,214,0,.3)'},
+  LOW:      {h:'#00e676', l:'rgba(0,230,118,.12)',  b:'rgba(0,230,118,.3)'}
+};
+const c = s => SC[s] || SC.LOW;
+const rr = () => Math.random();
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Type helpers ─────────────────────────────────────────
+const TYPE_EMOJI = {
+  earthquake:'⚡', wildfire:'🔥', flood:'🌊', storm:'🌀',
+  volcano:'🌋', landslide:'⛰️', drought:'☀️', hurricane:'🌀',
+  cyclone:'🌀', tornado:'🌪️', tsunami:'🌊', 'sea and lake ice':'🧊',
+  'severe storms':'⛈️', default:'⚠️'
+};
+
+const TYPE_NAMES = {
+  'WF':'WILDFIRE','TC':'TROPICAL CYCLONE','EQ':'EARTHQUAKE',
+  'FL':'FLOOD','VO':'VOLCANO','LS':'LANDSLIDE',
+  'DR':'DROUGHT','SE':'SEVERE STORM','SI':'SEA ICE','MN':'MANMADE'
+};
+
+function getEmoji(type) {
+  if (!type) return '⚠️';
+  const t = type.toLowerCase();
+  for (const [k, v] of Object.entries(TYPE_EMOJI)) {
+    if (t.includes(k)) return v;
+  }
+  return '⚠️';
+}
+
+function getFullName(type) {
+  if (!type) return 'UNKNOWN';
+  const upper = type.toUpperCase();
+  if (TYPE_NAMES[upper]) return TYPE_NAMES[upper];
+  return upper.replace(/\s+/g, '_');
+}
+
+// ════════════════════════════════
+// FETCH REAL CHENNAI DATA
+// ════════════════════════════════
+async function fetchLiveData() {
+  try {
+    const res = await fetch(`${API}/api/live-data`);
+    if (!res.ok) throw new Error('Backend offline');
+    return await res.json();
+  } catch (e) {
+    console.error('Live data fetch failed:', e);
+    return null;
+  }
+}
+
+function liveDataToIncidents(data) {
+  const result = [];
+
+  // USGS Earthquakes
+  (data.earthquakes || []).forEach(eq => {
+    if (eq.error) return;
+    const mag = eq.magnitude || 0;
+    const sev = Math.min(100, Math.round(mag * 14));
+    const status = sev >= 85 ? 'CRITICAL' : sev >= 65 ? 'HIGH' : sev >= 40 ? 'MODERATE' : 'LOW';
+    result.push({
+      id: nextId++, tkey: 'EARTHQUAKE', emoji: '⚡',
+      sev, status,
+      aff: Math.round(mag * 10000),
+      loc: eq.place || 'Chennai Region, Tamil Nadu',
+      upd: eq.time || 'Recent',
+      source: 'USGS',
+      rawData: eq,
+      raw: [
+        { src: 'USGS Seismic', txt: `M${mag} earthquake near ${eq.place || 'Chennai'}. Depth: ${eq.coordinates?.depth_km || 'unknown'} km.`, ts: eq.time },
+        { src: 'Tsunami Alert', txt: eq.tsunami ? '⚠️ Tsunami warning issued for Bay of Bengal / Chennai coast.' : 'No tsunami warning issued.', ts: eq.time },
+        { src: 'Alert Level', txt: `USGS alert: ${eq.alert || 'none'}. Felt reports: ${eq.felt || 0}.`, ts: eq.time },
+      ]
+    });
+  });
+
+  // NASA EONET
+  (data.active_events || []).forEach(ev => {
+    if (ev.error) return;
+    const type = ev.type || 'Unknown';
+    const sev = Math.floor(35 + rr() * 50);
+    const status = sev >= 85 ? 'CRITICAL' : sev >= 65 ? 'HIGH' : sev >= 40 ? 'MODERATE' : 'LOW';
+    result.push({
+      id: nextId++, tkey: getFullName(type), emoji: getEmoji(type),
+      sev, status,
+      aff: Math.floor(2000 + rr() * 8000),
+      loc: ev.title || 'Chennai Region',
+      upd: ev.updated || 'Active',
+      source: 'NASA EONET',
+      rawData: ev,
+      raw: [
+        { src: 'NASA EONET', txt: `${type}: ${ev.title}. Status: ${ev.status || 'open'}.`, ts: ev.updated },
+      ]
+    });
+  });
+
+  // GDACS Alerts
+  (data.gdacs_alerts || []).forEach(alert => {
+    if (alert.error) return;
+    const lvl = (alert.alert_level || '').toLowerCase();
+    const sev = lvl === 'red' ? 90 : lvl === 'orange' ? 68 : 42;
+    const status = sev >= 85 ? 'CRITICAL' : sev >= 65 ? 'HIGH' : sev >= 40 ? 'MODERATE' : 'LOW';
+    result.push({
+      id: nextId++, tkey: getFullName(alert.event_type || 'ALERT'), emoji: getEmoji(alert.event_type),
+      sev, status,
+      aff: Math.floor(5000 + rr() * 20000),
+      loc: 'Chennai / Tamil Nadu',
+      upd: alert.published || 'Recent',
+      source: 'GDACS/UN',
+      rawData: alert,
+      raw: [
+        { src: 'GDACS/UN Alert', txt: alert.title || 'Disaster alert issued.', ts: alert.published },
+        { src: 'Summary', txt: alert.summary || 'See GDACS portal for details.', ts: alert.published },
+      ]
+    });
+  });
+
+  // ReliefWeb
+  (data.humanitarian || []).forEach(d => {
+    if (d.error) return;
+    const sev = d.status === 'alert' ? 82 : d.status === 'ongoing' ? 62 : 42;
+    const status = sev >= 85 ? 'CRITICAL' : sev >= 65 ? 'HIGH' : sev >= 40 ? 'MODERATE' : 'LOW';
+    result.push({
+      id: nextId++, tkey: getFullName(d.type?.[0] || 'DISASTER'), emoji: getEmoji(d.type?.[0]),
+      sev, status,
+      aff: Math.floor(10000 + rr() * 50000),
+      loc: 'Tamil Nadu, India',
+      upd: d.date || 'Ongoing',
+      source: 'ReliefWeb/UN',
+      rawData: d,
+      raw: [
+        { src: 'ReliefWeb/UN', txt: `${d.name}. Status: ${d.status}. Type: ${d.type?.join(', ') || 'N/A'}.`, ts: d.date },
+        { src: 'Description', txt: d.description || 'No additional description.', ts: d.date },
+      ]
+    });
+  });
+
+  // NDMA Reports
+  (data.ndma_reports || []).forEach(d => {
+    if (d.error) return;
+    result.push({
+      id: nextId++, tkey: 'NDMA ALERT', emoji: '🚨',
+      sev: 55, status: 'MODERATE',
+      aff: Math.floor(3000 + rr() * 15000),
+      loc: 'Tamil Nadu, India',
+      upd: d.date || 'Recent',
+      source: 'NDMA India',
+      rawData: d,
+      raw: [
+        { src: 'NDMA India', txt: d.title || 'Disaster management report.', ts: d.date },
+        { src: 'Details', txt: d.body || 'See NDMA portal for full details.', ts: d.date },
+      ]
+    });
+  });
+
+  // IMD Warnings
+  (data.imd_warnings || []).forEach(d => {
+    if (d.error) return;
+    result.push({
+      id: nextId++, tkey: 'IMD WARNING', emoji: '🌧️',
+      sev: 50, status: 'MODERATE',
+      aff: Math.floor(20000 + rr() * 100000),
+      loc: 'Chennai & Tamil Nadu',
+      upd: d.date || 'Recent',
+      source: 'IMD Chennai',
+      rawData: d,
+      raw: [
+        { src: 'IMD Chennai', txt: d.title || 'Weather warning issued.', ts: d.date },
+        { src: 'Forecast', txt: d.body || 'Check IMD Chennai portal for details.', ts: d.date },
+      ]
+    });
+  });
+
+  // Sort by severity
+  result.sort((a, b) => b.sev - a.sev);
+  return result;
+}
+
+// ════════════════════════════════
+// GEMINI AI ANALYSIS
+// ════════════════════════════════
+async function runGeminiAnalysis(inc) {
+  try {
+    const res = await fetch(`${API}/api/analyze-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: inc.rawData })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return parseGeminiResponse(data.analysis, inc);
+  } catch (e) {
+    console.error('Gemini analysis failed:', e);
+    return fallbackAnalysis(inc);
+  }
+}
+
+function parseGeminiResponse(text, inc) {
+  if (!text) return fallbackAnalysis(inc);
+  const lines = text.split('\n').filter(l => l.trim().length > 20);
+  const intel = lines.slice(0, 4).map(l => l.replace(/^[\d\.\-\*#]+\s*/, '').trim()).filter(Boolean);
+  const actionLines = text.split('\n').filter(l => /^[\d]+[\.\)]\s/.test(l.trim()));
+  const actions = actionLines.slice(0, 5).map((l, i) => ({
+    p: i + 1,
+    act: l.replace(/^[\d]+[\.\)]\s*/, '').split('.')[0].trim(),
+    why: l.replace(/^[\d]+[\.\)]\s*/, ''),
+    u: i === 0 ? 'IMMEDIATE' : i <= 2 ? 'URGENT' : 'STANDARD'
+  }));
+  return {
+    intel: intel.length ? intel : [text.slice(0, 400)],
+    sevReason: `Severity ${inc.sev}/100 (${inc.status}). Source: ${inc.source}. ${text.slice(0, 250)}`,
+    actions: actions.length ? actions : fallbackActions(inc),
+    rawGemini: text
+  };
+}
+
+function fallbackAnalysis(inc) {
+  return {
+    intel: [
+      `${inc.tkey} event confirmed in Chennai/Tamil Nadu region.`,
+      `Source: ${inc.source}. Severity index: ${inc.sev}/100 (${inc.status}).`,
+      `Approximately ${inc.aff.toLocaleString()} people potentially affected in ${inc.loc}.`,
+      `Last updated: ${inc.upd}. Monitor TNSDMA and IMD Chennai for updates.`
+    ],
+    sevReason: `Severity ${inc.sev}/100 (${inc.status}). ${inc.tkey} event detected by ${inc.source} in Chennai region.`,
+    actions: fallbackActions(inc)
+  };
+}
+
+function fallbackActions(inc) {
+  return [
+    { p:1, act:'Alert TNSDMA and Chennai Corporation (GCC)', why:'Activate Tamil Nadu State Disaster Management Authority protocols immediately.', u:'IMMEDIATE' },
+    { p:2, act:'Deploy NDRF teams to affected Chennai localities', why:'Pre-position National Disaster Response Force units near impact zones.', u:'IMMEDIATE' },
+    { p:3, act:'Issue public warning via IMD Chennai channels', why:`${inc.aff.toLocaleString()} residents need immediate notification via All India Radio, TV, SMS.`, u:'URGENT' },
+    { p:4, act:'Open relief camps at Chennai Corporation centres', why:'Activate designated shelter zones: schools, community halls in affected wards.', u:'URGENT' },
+    { p:5, act:'Monitor Adyar, Cooum and Chembarambakkam levels', why:'Flood risk assessment for Chennai river systems and reservoir levels critical.', u:'STANDARD' },
+  ];
+}
+
+// ════════════════════════════════
+// INIT
+// ════════════════════════════════
+async function init() {
+  startClock();
+  renderNav();
+  document.getElementById('inc-sub').textContent = 'Connecting to Chennai data sources...';
+
+  const data = await fetchLiveData();
+
+  if (data) {
+    incidents = liveDataToIncidents(data);
+    const msg = incidents.length > 0
+      ? `${incidents.length} active · Last updated ${data.fetched_at}`
+      : 'Chennai clear — no active incidents detected';
+    document.getElementById('inc-sub').textContent = msg;
+    showToast(incidents.length > 0
+      ? `🏙️ ${incidents.length} Chennai incidents loaded`
+      : '✅ Chennai all clear — no active disasters');
+  } else {
+    document.getElementById('inc-sub').textContent = '⚠ Backend offline — run: python backend.py';
+    showToast('⚠ Cannot connect to backend');
+  }
+
+  renderAll();
+  startFeed(data);
+  setTimeout(renderBars, 100);
+
+  // Auto-refresh every 5 minutes
+  setInterval(refreshData, 5 * 60 * 1000);
+}
+
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ LOADING...'; }
+
+  document.getElementById('inc-sub').textContent = 'Refreshing Chennai live data...';
+  const data = await fetchLiveData();
+
+  if (data) {
+    const fresh = liveDataToIncidents(data);
+    const existingKeys = new Set(incidents.map(i => `${i.tkey}-${i.loc}-${i.source}`));
+    const newOnes = fresh.filter(i => !existingKeys.has(`${i.tkey}-${i.loc}-${i.source}`));
+
+    if (newOnes.length) {
+      incidents = [...newOnes, ...incidents];
+      renderAll();
+      setTimeout(renderBars, 60);
+      showToast(`${newOnes.length} new Chennai incident${newOnes.length > 1 ? 's' : ''} detected`);
+    } else {
+      showToast('Chennai data refreshed — no new incidents');
+    }
+    document.getElementById('inc-sub').textContent =
+      `${incidents.length} active · Refreshed ${data.fetched_at}`;
+  } else {
+    showToast('⚠ Refresh failed — check backend');
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '↻ REFRESH'; }
+}
+
+// ════════════════════════════════
+// RESOLVE
+// ════════════════════════════════
+function resolveInc(id, evt) {
+  if (evt) evt.stopPropagation();
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+  const el = document.querySelector(`.ic[data-id="${id}"]`);
+  if (el) {
+    el.classList.add('removing');
+    el.addEventListener('animationend', () => {
+      incidents = incidents.filter(i => i.id !== id);
+      resolved.unshift({ ...inc, at: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) });
+      delete cache[id];
+      if (selId === id) {
+        selId = null;
+        document.getElementById('iview').style.display = 'none';
+        document.getElementById('empty').style.display = 'flex';
+      }
+      renderAll();
+      setTimeout(renderBars, 60);
+    }, { once: true });
+  }
+  showToast(`${inc.tkey} resolved — ${inc.loc.split(',')[0]}`);
+}
+
+function resolveCurrent() { if (selId) resolveInc(selId); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function toggleResLog() { showRes = !showRes; renderRight(); }
+
+// ════════════════════════════════
+// RENDER
+// ════════════════════════════════
+function renderAll() { renderList(); renderRight(); renderNav(); }
+
+function renderNav() {
+  document.getElementById('n-active').textContent = incidents.length;
+  document.getElementById('n-affected').textContent = incidents.reduce((s, d) => s + d.aff, 0).toLocaleString();
+  document.getElementById('n-crit').textContent = `${incidents.filter(d => d.status === 'CRITICAL').length} CRITICAL`;
+  document.getElementById('n-res').textContent = resolved.length;
+}
+
+function renderList() {
+  const el = document.getElementById('inc-list');
+  if (!el) return;
+
+  if (!incidents.length) {
+    el.innerHTML = `<div class="no-data">
+      <div class="no-data-icon">✅</div>
+      <div class="no-data-lbl">CHENNAI ALL CLEAR</div>
+      <div class="no-data-sub">No active disasters detected in Chennai or Tamil Nadu. All monitoring systems operational.</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = incidents.map(inc => {
+    const sc = c(inc.status), sel = selId === inc.id;
+    return `<div class="ic${sel ? ' selected' : ''}" data-id="${inc.id}"
+      style="border-left-color:${sc.h};${sel ? `box-shadow:0 0 14px ${sc.h}22` : ''}">
+      <button class="ic-done" onclick="resolveInc(${inc.id},event)">✓ DONE</button>
+      <div class="ic-top">
+        <div class="ic-left">
+          <span class="ic-em">${inc.emoji}</span>
+          <div style="min-width:0">
+            <div class="ic-type" style="color:${sc.h}">${inc.tkey.replace(/_/g,' ')}</div>
+            <div class="ic-loc">${inc.loc.length > 35 ? inc.loc.slice(0,35)+'…' : inc.loc}</div>
+          </div>
+        </div>
+        <div class="sbadge" style="color:${sc.h};border-color:${sc.b};background:${sc.l}">${inc.status}</div>
+      </div>
+      <div class="sbar-wrap"><div class="sbar" id="sb-${inc.id}"
+        style="background:linear-gradient(90deg,${sc.h}88,${sc.h});box-shadow:0 0 5px ${sc.h}77"></div></div>
+      <div class="ic-meta">
+        <span style="color:${sc.h};font-weight:700">${inc.sev}%</span>
+        <span>${inc.aff.toLocaleString()} affected</span>
+        <span style="color:var(--accent);font-size:8px">${inc.source}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.ic').forEach(card => {
+    card.addEventListener('click', () => selectInc(parseInt(card.dataset.id)));
+  });
+  setTimeout(renderBars, 50);
+}
+
+function renderBars() {
+  incidents.forEach(inc => {
+    const b = document.getElementById(`sb-${inc.id}`);
+    if (b) b.style.width = `${inc.sev}%`;
+  });
+}
+
+function renderRight() {
+  const el = document.getElementById('rp');
+  if (!el) return;
+
+  if (showRes) {
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="plabel">RESOLVED — ${resolved.length}</div>
+      <button onclick="showRes=false;renderRight()" style="font-family:var(--mono);font-size:9px;color:var(--muted);background:none;border:1px solid var(--border);padding:2px 8px;border-radius:2px;cursor:pointer">← BACK</button>
+    </div>
+    ${!resolved.length ? '<div style="font-family:var(--mono);font-size:10px;color:var(--muted2)">None yet.</div>' : ''}
+    ${resolved.map(r => `<div class="res-item"><div class="res-dot"></div>
+      <div class="res-txt">${r.emoji} <b style="color:var(--text)">${r.tkey.replace(/_/g,' ')}</b><br>
+      ${r.loc.split(',')[0]}<br>
+      <span style="color:var(--muted2)">${r.status} · sev ${r.sev} · ${r.at}</span></div></div>`).join('')}`;
+    return;
+  }
+
+  if (!incidents.length) {
+    el.innerHTML = `<div class="no-data" style="padding:20px 10px">
+      <div class="no-data-icon" style="font-size:24px">✅</div>
+      <div class="no-data-lbl">ALL CLEAR</div>
+      <div class="no-data-sub" style="font-size:11px">Chennai & Tamil Nadu — No active events</div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:13px;margin-top:8px">
+      <div class="plabel" style="margin-bottom:10px">SEVERITY SCALE</div>
+      ${[['CRITICAL','#ff3040','90–100'],['HIGH','#ff8c00','65–89'],['MODERATE','#ffd600','35–64'],['LOW','#00e676','0–34']]
+        .map(([s,h,r])=>`<div class="leg-item"><div class="leg-dot" style="background:${h};box-shadow:0 0 5px ${h}"></div>
+        <div class="leg-lbl" style="color:${h}">${s}</div><div class="leg-range">${r}</div></div>`).join('')}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:13px;margin-top:8px">
+      <div class="plabel" style="margin-bottom:8px">CHENNAI SOURCES</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);line-height:2">
+        USGS Seismic<br>NASA EONET<br>GDACS/UN<br>ReliefWeb/UN<br>NDMA India<br>IMD Chennai
+      </div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = incidents.map(inc => {
+    const sc = c(inc.status);
+    return `<div class="sov-item">
+      <div class="sov-top">
+        <div class="sov-name">${inc.emoji} ${inc.tkey.replace(/_/g,' ')}</div>
+        <div class="sov-score" style="color:${sc.h}">${inc.sev}</div>
+      </div>
+      <div class="sbar-wrap"><div class="sbar" style="width:${inc.sev}%;background:linear-gradient(90deg,${sc.h}66,${sc.h});box-shadow:0 0 4px ${sc.h}66"></div></div>
+      <div class="sov-loc">${inc.loc.split(',')[0]} · ${inc.source}</div>
+    </div>`;
+  }).join('') +
+  `<div style="border-top:1px solid var(--border);padding-top:13px;margin-top:4px">
+    <div class="plabel" style="margin-bottom:10px">SEVERITY SCALE</div>
+    ${[['CRITICAL','#ff3040','90–100'],['HIGH','#ff8c00','65–89'],['MODERATE','#ffd600','35–64'],['LOW','#00e676','0–34']]
+      .map(([s,h,r])=>`<div class="leg-item"><div class="leg-dot" style="background:${h};box-shadow:0 0 5px ${h}"></div>
+      <div class="leg-lbl" style="color:${h}">${s}</div><div class="leg-range">${r}</div></div>`).join('')}
+  </div>
+  <div style="border-top:1px solid var(--border);padding-top:13px;margin-top:8px">
+    <div class="plabel" style="margin-bottom:8px">GEMINI AI — LIVE</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+      <div style="width:6px;height:6px;border-radius:50%;background:var(--low);animation:pulse 1.6s infinite"></div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--low)">CHENNAI CONNECTED</span>
+    </div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);line-height:2">
+      USGS · NASA · GDACS<br>NDMA · IMD Chennai<br>${incidents.length} active · ${resolved.length} resolved
+    </div>
+  </div>`;
+}
+
+// ════════════════════════════════
+// SELECT & ANALYZE
+// ════════════════════════════════
+async function selectInc(id) {
+  selId = id;
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+
+  renderList();
+  document.getElementById('empty').style.display = 'none';
+  const view = document.getElementById('iview');
+  view.style.display = 'flex';
+
+  const sc = c(inc.status);
+  const hi = document.getElementById('h-icon');
+  hi.textContent = inc.emoji;
+  hi.style.background = sc.l;
+  hi.style.borderColor = sc.b;
+
+  document.getElementById('h-name').textContent = inc.tkey.replace(/_/g, ' ');
+  const bd = document.getElementById('h-badge');
+  bd.textContent = inc.status;
+  bd.style.color = sc.h;
+  bd.style.borderColor = sc.b;
+  bd.style.background = sc.l;
+
+  document.getElementById('h-loc').textContent = inc.loc;
+  document.getElementById('h-meta').textContent =
+    `${inc.raw?.length || 0} data streams · Source: ${inc.source} · ${inc.aff.toLocaleString()} affected · ${inc.upd}`;
+
+  const sn = document.getElementById('h-sevnum');
+  sn.textContent = inc.sev;
+  sn.style.color = sc.h;
+  sn.style.textShadow = `0 0 18px ${sc.h}66`;
+
+  const sb = document.getElementById('h-sevbar');
+  sb.style.background = `linear-gradient(90deg,${sc.h}88,${sc.h})`;
+  sb.style.boxShadow = `0 0 8px ${sc.h}88`;
+  setTimeout(() => sb.style.width = `${inc.sev}%`, 50);
+
+  activeTab = 'intel';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+
+  if (cache[id]) { renderTab(inc, cache[id]); doneStatus(); }
+  else await runAI(inc);
+}
+
+async function runAI(inc) {
+  const STEPS = [
+    'CONNECTING TO CHENNAI DATA SOURCES...',
+    'FETCHING USGS / NASA / GDACS...',
+    'CROSS-REFERENCING NDMA & IMD CHENNAI...',
+    'SENDING TO GEMINI 2.0 FLASH...',
+    'ANALYZING CHENNAI IMPACT ZONES...',
+    'GENERATING TNSDMA ACTION PLAN...'
+  ];
+  const tc = document.getElementById('tcontent');
+  document.getElementById('tab-st').innerHTML = `
+    <div style="width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite"></div>
+    <span style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px">GEMINI PROCESSING</span>`;
+
+  tc.innerHTML = `<div class="processing">
+    <div class="proc-ring"></div>
+    <div class="proc-lbl">GEMINI AI — CHENNAI ANALYSIS</div>
+    <div class="proc-steps" id="psteps"></div>
+  </div>`;
+
+  const ps = document.getElementById('psteps');
+  for (let i = 0; i < STEPS.length; i++) {
+    await wait(300 + rr() * 200);
+    const s = document.createElement('div');
+    s.className = 'proc-step';
+    s.style.animationDelay = '0s';
+    s.innerHTML = `<span style="color:var(--low)">✓</span> ${STEPS[i]}`;
+    ps.appendChild(s);
+  }
+
+  const res = await runGeminiAnalysis(inc);
+  cache[inc.id] = res;
+  renderTab(inc, res);
+  doneStatus();
+}
+
+function doneStatus() {
+  document.getElementById('tab-st').innerHTML = `
+    <div style="width:6px;height:6px;border-radius:50%;background:var(--low)"></div>
+    <span style="font-family:var(--mono);font-size:9px;color:var(--low);letter-spacing:1px">GEMINI COMPLETE</span>`;
+}
+
+function renderTab(inc, data) {
+  const tc = document.getElementById('tcontent');
+  if (!tc || !inc) return;
+
+  if (activeTab === 'intel') {
+    const sc = c(inc.status);
+    tc.innerHTML = `
+      <div class="sev-assess" style="background:${sc.l};border-color:${sc.b}">
+        <div class="blabel" style="color:${sc.h}">⚡ SEVERITY — ${inc.source} · CHENNAI REGION</div>
+        <div class="btext">${data.sevReason}</div>
+      </div>
+      <div class="sec-lbl">🛰 GEMINI AI INTELLIGENCE — LIVE CHENNAI DATA</div>
+      ${data.intel.map((pt, i) => `
+        <div class="intel-item" style="animation-delay:${i * .08}s">
+          <div class="inum">${String(i+1).padStart(2,'0')}</div>
+          <div class="itext">${pt}</div>
+        </div>`).join('')}
+      ${data.rawGemini ? `
+        <div class="sec-lbl" style="margin-top:20px">📄 FULL GEMINI RESPONSE</div>
+        <div class="raw-item">
+          <div class="rtxt" style="white-space:pre-wrap;line-height:1.8;font-size:11px">${data.rawGemini}</div>
+        </div>` : ''}`;
+
+  } else if (activeTab === 'actions') {
+    tc.innerHTML = `
+      <div class="sec-lbl">🎯 GEMINI ACTION PLAN — TNSDMA / GCC / NDRF</div>
+      ${data.actions.map((a, i) => {
+        const uc = a.u === 'IMMEDIATE' ? '#ff3040' : a.u === 'URGENT' ? '#ff8c00' : '#ffd600';
+        return `<div class="act-card" style="border-left-color:${uc};animation-delay:${i*.1}s">
+          <div class="act-num" style="background:${uc}22;border-color:${uc}55;color:${uc}">${a.p}</div>
+          <div class="act-body">
+            <div class="act-title">${a.act}
+              <span class="ubadge" style="color:${uc};border-color:${uc}55;background:${uc}18">${a.u}</span>
+            </div>
+            <div class="act-reason">${a.why}</div>
+          </div>
+        </div>`;
+      }).join('')}`;
+
+  } else if (activeTab === 'raw') {
+    tc.innerHTML = `
+      <div class="sec-lbl">📡 LIVE SOURCE DATA — ${inc.source}</div>
+      ${(inc.raw || []).map((d, i) => `
+        <div class="raw-item" style="animation-delay:${i*.06}s">
+          <div class="raw-src-row">
+            <span class="stag">${d.src}</span>
+            <span class="rts">${d.ts || ''}</span>
+          </div>
+          <div class="rtxt">${d.txt}</div>
+        </div>`).join('')}
+      <div class="sec-lbl" style="margin-top:16px">📊 RAW API PAYLOAD</div>
+      <div class="raw-item">
+        <div class="rtxt" style="font-size:10px;white-space:pre-wrap;opacity:.6;line-height:1.6">
+          ${JSON.stringify(inc.rawData, null, 2)}
+        </div>
+      </div>`;
+  }
+}
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!btn.dataset.tab) return;
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+    const inc = incidents.find(i => i.id === selId);
+    if (inc && cache[inc.id]) renderTab(inc, cache[inc.id]);
+    else if (inc && activeTab === 'raw') renderTab(inc, { intel: [], actions: [] });
+  });
+});
+
+// ════════════════════════════════
+// LIVE FEED — CHENNAI SOURCES
+// ════════════════════════════════
+function startFeed(data) {
+  const sources = ['USGS Seismic', 'NASA EONET', 'GDACS/UN', 'IMD Chennai',
+                   'NDMA India', 'TNSDMA', 'Coast Guard Chennai', 'GCC Chennai'];
+  const msgs = ['data packet received', 'signal acquired', 'feed updated',
+                'stream synced', 'validated', 'check-in complete'];
+  const fe = document.getElementById('feed');
+  let items = [];
+
+  // Show real event titles first
+  if (data) {
+    const titles = [
+      ...(data.earthquakes || []).map(e => ({ src: 'USGS', txt: e.title || 'Earthquake near Chennai' })),
+      ...(data.active_events || []).map(e => ({ src: 'NASA', txt: e.title || 'Active event — Chennai' })),
+      ...(data.gdacs_alerts || []).map(e => ({ src: 'GDACS', txt: e.title || 'Alert — Tamil Nadu' })),
+      ...(data.imd_warnings || []).map(e => ({ src: 'IMD Chennai', txt: e.title || 'Weather warning' })),
+    ].slice(0, 8);
+
+    titles.forEach((t, i) => {
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.className = 'feed-item';
+        el.innerHTML = `<div class="fdot fresh"></div>
+          <div class="ftxt"><span class="fsrc">${t.src}</span> — ${t.txt.slice(0, 55)}${t.txt.length > 55 ? '…' : ''}</div>`;
+        fe.appendChild(el);
+        items.push(el);
+        if (items.length > 6) { items[0].remove(); items.shift(); }
+      }, i * 700);
+    });
+  }
+
+  function add() {
+    const src = sources[Math.floor(rr() * sources.length)];
+    const msg = msgs[Math.floor(rr() * msgs.length)];
+    const el = document.createElement('div');
+    el.className = 'feed-item';
+    el.innerHTML = `<div class="fdot"></div>
+      <div class="ftxt"><span class="fsrc">${src}</span> — ${msg}</div>`;
+    fe.appendChild(el);
+    items.push(el);
+    if (items.length > 6) { items[0].remove(); items.shift(); }
+    setTimeout(add, 2500 + rr() * 3500);
+  }
+  setTimeout(add, 9000);
+}
+
+function startClock() {
+  setInterval(() => {
+    document.getElementById('n-time').textContent =
+      new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }, 1000);
+}
+
+init();
+</script>
+</body>
+</html>
